@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"></meta>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"></meta>
+    <title>Hearing the Alarm</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&amp;display=swap" rel="stylesheet"></link>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"></link>
+    <style>
+        /* General Body and Neumorphic Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            line-height: 1.6;
+            color: #536175;
+            background: #e0e5ec;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden; /* Prevent body scroll */
+            touch-action: auto;
+        }
+
+        body.pen-active {
+            /* Hide the native system cursor, as we are using a custom DOM element for it */
+            cursor: none;
+            touch-action: none;
+            /* Prevents text selection while drawing */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        #custom-cursor {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            z-index: 9999;
+            pointer-events: none; /* The cursor element should not intercept clicks */
+            display: none; /* Hidden by default */
+            transform: translate(-50%, -50%); /* Center the cursor on the pointer's tip */
+        }
+
+        #custom-cursor.visible {
+            display: block;
+        }
+
+        h1, h2, h3 {
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #536175;
+            text-shadow: 1px 1px 1px #ffffff;
+        }
+
+        .neumorphic-raised {
+            background-color: #e0e5ec;
+            border-radius: 15px;
+            border: none;
+            box-shadow: 5px 5px 10px #a3b1c6, -5px -5px 10px #ffffff;
+            transition: all 0.3s ease;
+        }
+
+        .sentence-box.neumorphic-raised {
+            box-shadow: 2.5px 2.5px 5px #a3b1c6, -2.5px -2.5px 5px #ffffff;
+        }
+
+        .neumorphic-pressed {
+            background-color: #e0e5ec;
+            border-radius: 15px;
+            border: none;
+            box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
+        }
+        
+        /* Button Styles */
+        button {
+            font-family: inherit;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.15s ease;
+            outline: none;
+            flex-shrink: 0;
+            background-color: #e0e5ec;
+            color: #536175;
+            box-shadow: 5px 5px 10px #a3b1c6, -5px -5px 10px #ffffff;
+            text-shadow: 1px 1px 1px #ffffff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            background-color: #dde3eb;
+            color: #6d5dfc;
+            box-shadow: 6px 6px 12px #a3b1c6, -6px -6px 12px #ffffff;
+        }
+
+        button:active {
+            transform: translateY(0px);
+            background-color: #cad1d9;
+            box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
+        }
+
+        button.primary {
+            background-color: #6d5dfc;
+            color: #ffffff;
+            font-weight: 700;
+            text-shadow: none;
+        }
+        
+        /* Main Application Containers */
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            padding: 35px;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        #start-screen {
+            display: flex;
+        }
+
+        .title-wrapper {
+            padding: 20px 35px;
+            margin-bottom: 35px;
+        }
+
+        .gradient-heading {
+            font-size: calc(2.4em + 2px); 
+            margin: 0;
+        }
+        
+        /* Popup Styles */
+        #popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 95%;
+            max-width: 1100px;
+            height: 95vh;
+            max-height: 850px;
+            padding: 20px;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            box-sizing: border-box;
+            overflow: hidden;
+            gap: 15px;
+        }
+        
+        #sentence-indicator-wrapper {
+            z-index: 1002;
+            display: flex;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .popup-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .popup-header-part {
+            padding: 8px 16px;
+            font-size: calc(1.1em + 5px);
+            font-weight: 600;
+            text-align: center;
+        }
+
+        #topic-header {
+            font-size: calc(1.1em + 6px);
+            color: #3d5af1;
+            font-weight: 700;
+        }
+
+        #sentence-indicator {
+            padding: 5px 15px;
+            font-family: 'Monospace', sans-serif;
+            color: #0000ff;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 0, 255, 0.7);
+            line-height: 1;
+        }
+        
+        #popup-grid {
+            flex-grow: 1;
+            min-height: 0;
+            width: 100%;
+            display: grid;
+            grid-template-rows: 0.8fr 1.2fr 0.8fr; 
+            align-items: center;
+            gap: 15px; 
+            overflow: hidden;
+            position: relative;
+            transition: gap 0.3s ease;
+            pointer-events: none;
+        }
+        
+        #line-svg-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .content-slot {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 10px 15px;
+            box-sizing: border-box;
+            transition: opacity 0.4s ease;
+            opacity: 0;
+            gap: 15px;
+            z-index: 2;
+            position: relative;
+            pointer-events: auto;
+        }
+
+        .content-slot.visible {
+            opacity: 1;
+        }
+
+        .sentence-box {
+            padding: 14px 24px;
+            font-size: 1.8em;
+            font-weight: 600;
+            line-height: 1.5;
+            text-align: center;
+            width: fit-content;
+            max-width: 100%;
+        }
+
+        .hindi-sentence {
+            font-family: 'Noto Sans Devanagari', sans-serif;
+        }
+
+        .meaning-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .meaning-pair {
+            background: #e8eef5;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: calc(1.3em + 4px);
+            font-weight: 600;
+            box-shadow: 3px 3px 6px #a3b1c6, -3px -3px 6px #ffffff;
+            white-space: nowrap;
+        }
+
+        .meaning-pair .hin {
+             font-family: 'Noto Sans Devanagari', sans-serif;
+             color: #6d5dfc;
+             font-weight: 700;
+        }
+        
+        .meaning-pair .eng {
+            pointer-events: none;
+        }
+
+        .phrasal-verb-display {
+            background: #e8eef5;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: calc(1.3em + 4px);
+            font-weight: 600;
+            box-shadow: 3px 3px 6px #a3b1c6, -3px -3px 6px #ffffff;
+            white-space: nowrap;
+        }
+
+        .phrasal-verb-display .eng {
+            color: red;
+            font-weight: 700;
+        }
+
+        .phrasal-verb-display .hin {
+            font-family: 'Noto Sans Devanagari', sans-serif;
+            color: black;
+        }
+
+        .word-highlight {
+            padding: 3px 8px;
+            border-radius: 8px;
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.7);
+            transition: background-color 0.3s ease;
+            display: inline-block;
+            box-shadow: 2px 2px 4px #a3b1c6, -2px -2px 4px #ffffff;
+        }
+
+        .special-notes-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .note-section {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+        }
+
+        .note-label {
+            font-weight: 700;
+            color: #3d5af1;
+            font-size: calc(1.2em + 4px);
+            white-space: nowrap;
+            flex-shrink: 0;
+            padding: 8px 14px;
+            border-radius: 12px;
+        }
+
+        .note-values {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .pen-dropdown {
+            position: fixed;
+            top: 25px; 
+            left: 45px; 
+            z-index: 1006;
+            display: none;
+        }
+        
+        #drawing-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1004;
+            pointer-events: none;
+            touch-action: none;
+        }
+
+        #meanings-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(224, 229, 236, 0.95);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #meanings-popup-content {
+            box-shadow: 10px 10px 20px #a3b1c6, -10px -10px 20px #ffffff;
+            padding: 30px;
+            border-radius: 20px;
+            background: #e0e5ec;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        @media (max-width: 768px) {
+            .sentence-box { font-size: 1.4em; }
+            .meaning-pair, .phrasal-verb-display { font-size: calc(1.1em + 4px); }
+        }
+        
+        @media (max-width: 480px) {
+            .sentence-box { font-size: 1.2em; }
+            .meaning-pair, .phrasal-verb-display { font-size: calc(1em + 4px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="custom-cursor"></div>
+
+    <div class="container" id="start-screen">
+        <div class="title-wrapper neumorphic-raised">
+            <h1 class="gradient-heading">Hearing the Alarm</h1>
+        </div>
+        <button class="primary" onclick="showPopup()" style="display: none;">Start Learning</button>
+    </div>
+
+    <div class="neumorphic-raised" id="popup">
+        <div id="sentence-indicator-wrapper">
+             <div class="neumorphic-pressed" id="sentence-indicator">01</div>
+        </div>
+
+        <div class="popup-header">
+            <div>
+                 <span class="popup-header-part neumorphic-raised">Spoken English</span>
+                 <span class="popup-header-part neumorphic-raised">Daily Use Sentences</span>
+            </div>
+            <div class="popup-header-part neumorphic-raised" id="topic-header">Topic: In the Classroom</div>
+        </div>
+        
+        <div class="neumorphic-pressed" id="popup-grid">
+            <svg id="line-svg-canvas"></svg>
+            <div class="content-slot" id="content-slot-0"></div>
+            <div class="content-slot" id="content-slot-1"></div>
+            <div class="content-slot" id="content-slot-2"></div>
+        </div>
+    </div>
+
+    <div id="meanings-popup" onclick="hideMeaningsPopup()">
+        <div id="meanings-popup-content" onclick="event.stopPropagation()">
+        </div>
+    </div>
+
+    <div class="pen-dropdown" id="pen-controls">
+        <div class="pen-dropdown-content neumorphic-raised">
+             <label for="pen-color">Color:</label>
+            <input aria-label="Pen color" id="pen-color" type="color" value="#0020C2" />
+            <label for="pen-size">Size:</label>
+            <input aria-label="Pen size" id="pen-size" max="20" min="1" type="range" value="3" />
+            <button onclick="clearCanvas()">Clear</button>
+        </div>
+    </div>
+
+    <canvas id="drawing-canvas"></canvas>
+
+    <script>
+        const conversationData = [
+            // Classroom
+            {
+                topic: "In the Classroom",
+                english: "Please open your books to page number ten.",
+                hindi: "कृपया अपनी किताबें पेज नंबर दस पर खोलिए।",
+                meanings: [ { eng: "Please", hin: "कृपया" }, { eng: "open", hin: "खोलिए" }, { eng: "your", hin: "आपकी / तुम्हारी" }, { eng: "books", hin: "किताबें" }, { eng: "to page number ten", hin: "पेज नंबर दस पर" } ]
+            },
+            {
+                topic: "In the Classroom",
+                english: "May I go to the washroom, ma'am?",
+                hindi: "क्या मैं वॉशरूम जा सकता/सकती हूँ, मैम?",
+                meanings: [ { eng: "May I", hin: "क्या मैं (अनुमति के लिए)" }, { eng: "go", hin: "जाना" }, { eng: "to the washroom", hin: "वॉशरूम (शौचालय) में" }, { eng: "ma'am", hin: "मैडम / मैम" } ]
+            },
+            {
+                topic: "In the Classroom",
+                english: "Raise your hand if you know the answer.",
+                hindi: "अगर आपको जवाब पता है तो हाथ उठाइए।",
+                meanings: [ { eng: "Raise", hin: "उठाइए" }, { eng: "your hand", hin: "अपना हाथ" }, { eng: "if", hin: "अगर" }, { eng: "you know", hin: "आपको पता है" }, { eng: "the answer", hin: "उत्तर / जवाब" } ]
+            },
+            {
+                topic: "In the Classroom",
+                english: "Don't talk while I am teaching.",
+                hindi: "जब मैं पढ़ा रहा/रही हूँ, तब बात मत कीजिए।",
+                meanings: [ { eng: "Don't", hin: "मत" }, { eng: "talk", hin: "बात कीजिए" }, { eng: "while", hin: "जब" }, { eng: "I am teaching", hin: "मैं पढ़ा रहा/रही हूँ" } ]
+            },
+            {
+                topic: "In the Classroom",
+                english: "Write this down in your notebook.",
+                hindi: "इसे अपनी नोटबुक में लिख लीजिए।",
+                meanings: [ { eng: "Write this down", hin: "इसे लिख लीजिए" }, { eng: "in your notebook", hin: "अपनी नोटबुक में" } ],
+                phrasalVerb: { verb: "Write down", meaning: "लिखना" },
+                additionalWords: [ { eng: "Write", hin: "लिखिए" }, { eng: "this", hin: "इसे" } ]
+            },
+            // Waking Up / Alarms
+            {
+                topic: "Waking Up",
+                english: "I have to wake up as soon as the alarm goes off.",
+                hindi: "जैसे ही अलार्म बजे, मुझे उठना होता है।",
+                meanings: [ { eng: "I have to", hin: "मुझे करना होता है" }, { eng: "wake up", hin: "उठना" }, { eng: "as soon as", hin: "जैसे ही" }, { eng: "the alarm", hin: "अलार्म" }, { eng: "goes off", hin: "बजता है / चालू होता है" } ],
+                phrasalVerb: [ { verb: "Wake up", meaning: "उठना" }, { verb: "Go off", meaning: "(अलार्म) बजना, (बम) फटना" } ]
+            },
+            {
+                topic: "Waking Up",
+                english: "I have this habit of hitting the snooze button multiple times.",
+                hindi: "मुझे स्नूज़ बटन को कई बार दबाने की आदत है।",
+                meanings: [ { eng: "I have", hin: "मुझे है" }, { eng: "this habit", hin: "यह आदत" }, { eng: "of hitting", hin: "दबाने की" }, { eng: "the snooze button", hin: "स्नूज़ बटन" }, { eng: "multiple times", hin: "कई बार" } ],
+                phrasalVerb: { verb: "Hit the snooze button", meaning: "स्नूज़ बटन दबाना" }
+            },
+            {
+                topic: "Waking Up",
+                english: "Even with alarms, I oversleep.",
+                hindi: "अलार्म के बावजूद भी मैं ज़्यादा देर तक सोता/सोती हूँ।",
+                meanings: [ { eng: "Even with", hin: "के बावजूद भी" }, { eng: "alarms", hin: "अलार्म" }, { eng: "I", hin: "मैं" }, { eng: "oversleep", hin: "ज़्यादा देर तक सो जाना" } ],
+                verb: { verb: "Oversleep", meaning: "देर तक सोना, अलार्म चूक जाना" }
+            },
+            {
+                topic: "Waking Up",
+                english: "No matter what I try, mornings are hard for me.",
+                hindi: "मैं कुछ भी कर लूँ, सुबहें मेरे लिए मुश्किल होती हैं।",
+                meanings: [ { eng: "No matter what", hin: "चाहे कुछ भी" }, { eng: "I try", hin: "मैं कोशिश करूँ" }, { eng: "mornings", hin: "सुबहें" }, { eng: "are hard", hin: "कठिन होती हैं" }, { eng: "for me", hin: "मेरे लिए" } ]
+            },
+            {
+                topic: "Waking Up",
+                english: "I've set three different alarms to make sure I wake up on time.",
+                hindi: "समय पर उठने के लिए मैंने तीन अलग-अलग अलार्म लगाए हैं।",
+                meanings: [ { eng: "I've set", hin: "मैंने लगाए हैं" }, { eng: "three different alarms", hin: "तीन अलग-अलग अलार्म" }, { eng: "to make sure", hin: "सुनिश्चित करने के लिए" }, { eng: "I wake up", hin: "मैं उठूँ" }, { eng: "on time", hin: "समय पर" } ],
+                phrasalVerb: [ { verb: "Set (an alarm)", meaning: "अलार्म लगाना" }, { verb: "Make sure", meaning: "सुनिश्चित करना" } ]
+            },
+            {
+                topic: "Waking Up",
+                english: "Could you please turn off the alarm? It's on your side of the bed.",
+                hindi: "क्या आप कृपया अलार्म बंद कर सकते हैं? यह आपके बिस्तर की तरफ है।",
+                meanings: [ { eng: "Could you please", hin: "क्या आप कृपया" }, { eng: "turn off", hin: "बंद कर दीजिए" }, { eng: "the alarm", hin: "अलार्म" }, { eng: "It's on", hin: "यह है" }, { eng: "your side", hin: "आपकी तरफ" }, { eng: "of the bed", hin: "बिस्तर की" } ],
+                phrasalVerb: { verb: "Turn off", meaning: "बंद करना" }
+            },
+            {
+                topic: "Waking Up",
+                english: "I have an important meeting today, so I can't afford to miss the alarm.",
+                hindi: "आज मेरी एक ज़रूरी मीटिंग है, इसलिए मैं अलार्म चूक नहीं सकता/सकती।",
+                meanings: [ { eng: "I have", hin: "मेरी है" }, { eng: "an important meeting", hin: "एक ज़रूरी मीटिंग" }, { eng: "today", hin: "आज" }, { eng: "so", hin: "इसलिए" }, { eng: "I can't afford", hin: "मैं झेल नहीं सकता/सकती" }, { eng: "to miss", hin: "चूकना" }, { eng: "the alarm", hin: "अलार्म" } ],
+                phrasalVerb: [ { verb: "Miss the alarm", meaning: "अलार्म न सुन पाना" }, { verb: "Can't afford to", meaning: "ऐसा करना संभव नहीं होना" } ]
+            }
+        ];
+
+        let currentSentenceIndex = 0;
+        let currentStep = 0;
+        const highlightColors = ['#e0e0e0', '#f0f0f3', '#ecf0f3', '#ddeaf6', '#fbeee6', '#fce4ec', '#e0f7fa', '#edf2f7', '#f5f0ff', '#e8f5e9'];
+        const lineColors = ['#4285F4', '#34A853', '#EA4335', '#673AB7', '#FF9800', '#009688', '#E91E63', '#03A9F4'];
+        let isPenActive = true; 
+
+        const startScreen = document.getElementById('start-screen');
+        const popup = document.getElementById('popup');
+        const popupGrid = document.getElementById('popup-grid');
+        const sentenceIndicator = document.getElementById('sentence-indicator');
+        const topicHeader = document.getElementById('topic-header');
+        const penControls = document.getElementById('pen-controls');
+        const canvas = document.getElementById('drawing-canvas');
+        const lineSvgCanvas = document.getElementById('line-svg-canvas');
+        const meaningsPopup = document.getElementById('meanings-popup');
+        const meaningsPopupContent = document.getElementById('meanings-popup-content');
+        const customCursor = document.getElementById('custom-cursor');
+        const ctx = canvas.getContext('2d');
+        const penColorInput = document.getElementById('pen-color');
+        const penSizeInput = document.getElementById('pen-size');
+        
+        let lineObserver = null;
+        
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        const debouncedUpdateLines = debounce(updateAndDrawLines, 50);
+        
+        const normalizeApostrophes = (text) => {
+            if (typeof text !== 'string') return '';
+            return text.replace(/[’`]/g, "'");
+        };
+
+        // NEW: Function to request full-screen mode
+        function enterFullScreen() {
+            const elem = document.documentElement; // Get the root <html> element
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(err => console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`));
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) { /* Firefox */
+                elem.mozRequestFullScreen();
+            } else if (elem.msRequestFullscreen) { /* IE/Edge */
+                elem.msRequestFullscreen();
+            }
+        }
+
+        function handleInteraction() {
+            // MODIFIED: Check if on the start screen
+            if (startScreen.style.display === 'flex') {
+                // First, try to enter full-screen mode
+                enterFullScreen();
+                // Then, show the popup content
+                showPopup();
+            } else {
+                currentStep++;
+                let isNewSentence = false;
+                if (currentStep > 3) {
+                    currentSentenceIndex = (currentSentenceIndex + 1) % conversationData.length;
+                    currentStep = 1; 
+                    isNewSentence = true;
+                }
+                renderConversationStep(isNewSentence);
+            }
+        }
+        
+        function decreaseFontSizes() {
+            const grid = document.getElementById('popup-grid');
+            const elements = grid.querySelectorAll('.sentence-box, .meaning-pair, .phrasal-verb-display');
+            let attempts = 0;
+
+            function checkAndShrink() {
+                if (grid.scrollHeight > grid.clientHeight && attempts < 15) {
+                    elements.forEach(el => {
+                        const style = window.getComputedStyle(el);
+                        const currentSize = parseFloat(style.fontSize);
+                        const newSize = currentSize - 0.5;
+                        if (newSize > 10) {
+                            el.style.fontSize = newSize + 'px';
+                        }
+                    });
+                    attempts++;
+                    requestAnimationFrame(checkAndShrink);
+                }
+            }
+            checkAndShrink();
+        }
+
+        function adjustLayoutForFit() {
+            const popupHeader = document.querySelector('.popup-header');
+            const contentSlots = popupGrid.querySelectorAll('.content-slot');
+            if (!popupGrid || !popupHeader || contentSlots.length === 0) return;
+
+            if (window.getComputedStyle(popupHeader).display === 'flex') {
+                let totalContentHeight = 0;
+                contentSlots.forEach(slot => {
+                    totalContentHeight += slot.scrollHeight;
+                });
+                
+                const gridGap = parseFloat(window.getComputedStyle(popupGrid).gap);
+                totalContentHeight += (Array.from(contentSlots).filter(s => s.scrollHeight > 1).length - 1) * gridGap;
+                
+                const availableHeight = popupGrid.clientHeight;
+
+                if (totalContentHeight > availableHeight) {
+                    popupHeader.style.display = 'none';
+                    popupGrid.style.gap = '5px';
+                    popupGrid.style.gridTemplateRows = 'auto 1fr auto'; 
+                }
+            }
+            
+            requestAnimationFrame(() => {
+                if (popupGrid.scrollHeight > popupGrid.clientHeight) {
+                    decreaseFontSizes();
+                }
+            });
+        }
+        
+        function resetLayoutStyles() {
+            const popupHeader = document.querySelector('.popup-header');
+            popupHeader.style.display = 'flex';
+            popupGrid.style.gap = '15px';
+            popupGrid.style.gridTemplateRows = '';
+            popupGrid.querySelectorAll('.sentence-box, .meaning-pair, .phrasal-verb-display, .note-label, .note-values').forEach(el => el.style.fontSize = '');
+        }
+
+        function renderConversationStep(isNewSentence) {
+            if (!popupGrid) return;
+            const data = conversationData[currentSentenceIndex];
+            sentenceIndicator.textContent = (currentSentenceIndex + 1).toString().padStart(2, '0');
+            topicHeader.textContent = `Topic: ${data.topic || 'General'}`;
+
+            const englishSlot = document.getElementById('content-slot-0');
+            const meaningSlot = document.getElementById('content-slot-1');
+            const hindiSlot = document.getElementById('content-slot-2');
+            
+            if (isNewSentence) {
+                clearCanvas();
+                lineSvgCanvas.innerHTML = '';
+                [englishSlot, meaningSlot, hindiSlot].forEach(slot => {
+                    slot.innerHTML = '';
+                    slot.classList.remove('visible');
+                });
+                resetLayoutStyles();
+            }
+
+            if (currentStep === 1) {
+                renderEnglishSentence(data, englishSlot);
+            } else if (currentStep === 2) {
+                updateEnglishSentenceWithHighlights(data, englishSlot);
+                renderWordMeanings(data, meaningSlot);
+                renderHindiSentence(data, hindiSlot, false); 
+            } else if (currentStep === 3) {
+                renderHindiSentence(data, hindiSlot, true);
+            }
+            
+            setTimeout(adjustLayoutForFit, 50);
+        }
+        
+        function renderEnglishSentence(data, slot) {
+            const sentenceBox = document.createElement('div');
+            sentenceBox.classList.add('sentence-box', 'english-sentence', 'neumorphic-raised');
+            sentenceBox.innerHTML = data.english;
+            slot.replaceChildren(sentenceBox);
+            slot.classList.add('visible');
+        }
+        
+        function updateEnglishSentenceWithHighlights(data, slot) {
+            const sentenceBox = slot.querySelector('.sentence-box') || document.createElement('div');
+            if (!slot.contains(sentenceBox)) {
+                sentenceBox.classList.add('sentence-box', 'english-sentence');
+            }
+            sentenceBox.classList.remove('neumorphic-raised');
+
+            let html = normalizeApostrophes(data.english);
+
+            const sortedMeanings = [...data.meanings].map((m, i) => ({...m, originalIndex: i})).sort((a, b) => b.eng.length - a.eng.length);
+            const shuffledColors = [...highlightColors].sort(() => 0.5 - Math.random());
+            
+            sortedMeanings.forEach((meaning, sortedIndex) => {
+                const color = shuffledColors[sortedIndex % shuffledColors.length];
+                const normalizedEng = normalizeApostrophes(meaning.eng);
+                const regex = new RegExp(`\\b(${normalizedEng.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'gi');
+                html = html.replace(regex, `<span class="word-highlight" data-id="word-${meaning.originalIndex}" style="background-color: ${color};">$1</span>`);
+            });
+
+            sentenceBox.innerHTML = html;
+            slot.replaceChildren(sentenceBox);
+            slot.classList.add('visible');
+        }
+
+        function checkMeaningsLength(data) {
+            let totalChars = 0;
+            data.meanings.forEach(m => { totalChars += (m.eng + m.hin).length; });
+            if (data.additionalWords) {
+                data.additionalWords.forEach(w => { totalChars += (w.eng + w.hin).length; });
+            }
+            return totalChars;
+        }
+
+        function renderWordMeanings(data, slot) {
+            const totalChars = checkMeaningsLength(data);
+            const characterLimit = 150;
+
+            const container = createMeaningsContainer(data);
+
+            if (totalChars > characterLimit) {
+                meaningsPopupContent.replaceChildren(container);
+                meaningsPopup.style.display = 'flex';
+                slot.innerHTML = '';
+                slot.classList.remove('visible');
+            } else {
+                slot.replaceChildren(container);
+                slot.classList.add('visible');
+            }
+        }
+
+        function createMeaningsContainer(data) {
+            const container = document.createElement('div'); 
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.alignItems = 'center';
+            container.style.gap = '15px';
+            container.style.width = '100%';
+
+            const meaningList = document.createElement('div');
+            meaningList.className = 'meaning-list';
+            data.meanings.forEach((meaning, index) => {
+                if (meaning.hin) {
+                    const pair = document.createElement('div');
+                    pair.className = 'meaning-pair';
+                    pair.setAttribute('data-id', `meaning-${index}`);
+                    pair.innerHTML = `<span class="eng">${meaning.eng}</span> – <span class="hin">${meaning.hin}</span>`;
+                    meaningList.appendChild(pair);
+                }
+            });
+            container.appendChild(meaningList);
+
+            if (data.additionalWords) {
+                const additionalList = document.createElement('div');
+                additionalList.className = 'meaning-list';
+                data.additionalWords.forEach((word) => {
+                    const pair = document.createElement('div');
+                    pair.className = 'meaning-pair';
+                    pair.innerHTML = `<span class="eng">${word.eng}</span> – <span class="hin">${word.hin}</span>`;
+                    additionalList.appendChild(pair);
+                });
+                container.appendChild(additionalList);
+            }
+            
+            const specialNotesContainer = document.createElement('div');
+            specialNotesContainer.className = 'special-notes-container';
+
+            if (data.phrasalVerb) {
+                const section = document.createElement('div');
+                section.className = 'note-section';
+                const label = document.createElement('div');
+                label.className = 'note-label neumorphic-raised';
+                label.textContent = 'Phrasal Verbs';
+                section.appendChild(label);
+                
+                const values = document.createElement('div');
+                values.className = 'note-values';
+                const verbs = Array.isArray(data.phrasalVerb) ? data.phrasalVerb : [data.phrasalVerb];
+                verbs.forEach(pv => {
+                    const note = document.createElement('div');
+                    note.className = 'phrasal-verb-display';
+                    note.innerHTML = `<span class="eng">${pv.verb}</span> - <span class="hin">${pv.meaning}</span>`;
+                    values.appendChild(note);
+                });
+                section.appendChild(values);
+                specialNotesContainer.appendChild(section);
+            }
+             if (data.verb) {
+                const section = document.createElement('div');
+                section.className = 'note-section';
+                const label = document.createElement('div');
+                label.className = 'note-label neumorphic-raised';
+                label.textContent = 'Verb';
+                section.appendChild(label);
+
+                const values = document.createElement('div');
+                values.className = 'note-values';
+                const note = document.createElement('div');
+                note.className = 'phrasal-verb-display';
+                note.innerHTML = `<span class="eng">${data.verb.verb}</span> - <span class="hin">${data.verb.meaning}</span>`;
+                values.appendChild(note);
+                section.appendChild(values);
+                specialNotesContainer.appendChild(section);
+            }
+
+            if (specialNotesContainer.hasChildNodes()) {
+                container.appendChild(specialNotesContainer);
+            }
+
+            return container;
+        }
+        
+        function hideMeaningsPopup() {
+            meaningsPopup.style.display = 'none';
+        }
+
+        function updateAndDrawLines() {
+            requestAnimationFrame(() => {
+                lineSvgCanvas.innerHTML = '';
+                if (currentStep !== 2 || popup.style.display !== 'flex' || meaningsPopup.style.display === 'flex') {
+                    return;
+                }
+
+                const data = conversationData[currentSentenceIndex];
+                const gridRect = popupGrid.getBoundingClientRect();
+                if (gridRect.width === 0 || gridRect.height === 0) return;
+
+                const connections = [];
+                data.meanings.forEach((_, index) => {
+                    const wordEl = document.querySelector(`.word-highlight[data-id="word-${index}"]`);
+                    const meaningPairEl = document.querySelector(`.meaning-pair[data-id="meaning-${index}"]`);
+                    if (wordEl && meaningPairEl) {
+                        connections.push({
+                            wordRect: wordEl.getBoundingClientRect(),
+                            meaningRect: meaningPairEl.getBoundingClientRect()
+                        });
+                    }
+                });
+
+                const numConnections = connections.length;
+                connections.forEach((conn, i) => {
+                    const { wordRect, meaningRect } = conn;
+
+                    const spacingFraction = (i + 1) / (numConnections + 1);
+
+                    const x1 = (wordRect.left + wordRect.width * spacingFraction) - gridRect.left;
+                    const y1 = wordRect.bottom - gridRect.top;
+                    
+                    const x2 = (meaningRect.left + meaningRect.width * spacingFraction) - gridRect.left;
+                    const y2 = meaningRect.top - gridRect.top;
+
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', x1);
+                    line.setAttribute('y1', y1);
+                    line.setAttribute('x2', x2);
+                    line.setAttribute('y2', y2);
+
+                    const lineColor = lineColors[i % lineColors.length];
+                    line.setAttribute('stroke', lineColor);
+                    line.setAttribute('stroke-width', '3');
+                    line.style.filter = 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))';
+
+                    lineSvgCanvas.appendChild(line);
+                });
+            });
+        }
+
+        function renderHindiSentence(data, slot, makeVisible = true) {
+            let sentenceBox = slot.querySelector('.sentence-box.hindi-sentence');
+
+            if (!sentenceBox) {
+                sentenceBox = document.createElement('div');
+                sentenceBox.classList.add('sentence-box', 'hindi-sentence', 'neumorphic-raised');
+                sentenceBox.textContent = data.hindi;
+                slot.replaceChildren(sentenceBox);
+            }
+
+            if (makeVisible) {
+                slot.classList.add('visible');
+            }
+        }
+        
+        function showPopup() {
+            currentSentenceIndex = 0;
+            currentStep = 1; 
+            showScreen(popup);
+            if (lineObserver) {
+                lineObserver.disconnect();
+                lineObserver.observe(popupGrid);
+                lineObserver.observe(document.getElementById('content-slot-0'));
+                lineObserver.observe(document.getElementById('content-slot-1'));
+            }
+            renderConversationStep(true); 
+        }
+        
+        function showScreen(screenElement) {
+            [startScreen, popup].forEach(el => el.style.display = 'none');
+            
+            penControls.style.display = 'none'; 
+
+            if (screenElement !== popup && lineObserver) {
+                lineObserver.disconnect();
+            }
+
+            if (screenElement) {
+                screenElement.style.display = 'flex'; 
+                
+                document.body.classList.add('pen-active');
+                canvas.style.pointerEvents = 'auto';
+                if (customCursor) customCursor.classList.add('visible');
+            }
+        }
+        
+        function initializeLineObserver() {
+            if ('ResizeObserver' in window) {
+                lineObserver = new ResizeObserver(() => {
+                    debouncedUpdateLines();
+                });
+            }
+        }
+
+        function setupCanvas() {
+            if (!canvas || !ctx) return;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = penSizeInput.value;
+            ctx.strokeStyle = penColorInput.value;
+        }
+
+        function clearCanvas() {
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function getCanvasPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function isInteractiveElement(target) {
+            return target && target.closest('#meanings-popup');
+        }
+        
+        function setupPenListeners() {
+            // Hidden pen control listeners
+            if (penSizeInput) {
+                penSizeInput.addEventListener('input', (e) => {
+                    ctx.lineWidth = e.target.value;
+                });
+            }
+            if (penColorInput) {
+                penColorInput.addEventListener('input', (e) => {
+                    ctx.strokeStyle = e.target.value;
+                });
+            }
+
+            // Keyboard listener
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && !e.repeat) {
+                    e.preventDefault();
+                    handleInteraction();
+                }
+                
+                const clearKeys = ['c', 'v', 'b', 'n', 'm'];
+                if (clearKeys.includes(e.key.toLowerCase())) {
+                    e.preventDefault();
+                    clearCanvas();
+                }
+            });
+
+            // Custom cursor tracking
+            document.addEventListener('pointermove', (e) => {
+                if (customCursor) {
+                    customCursor.style.left = e.clientX + 'px';
+                    customCursor.style.top = e.clientY + 'px';
+                }
+            });
+
+            // Event logic to distinguish Clicks from Drags
+            let isPointerDown = false;
+            let isDragging = false;
+            let downPoint = { x: 0, y: 0 };
+            let lastX, lastY;
+            const dragThreshold = 5; 
+
+            const onCanvasPointerDown = (e) => {
+                canvas.style.pointerEvents = 'none';
+                const elementUnderneath = document.elementFromPoint(e.clientX, e.clientY);
+                canvas.style.pointerEvents = 'auto';
+
+                if (isInteractiveElement(elementUnderneath)) {
+                    return;
+                }
+
+                e.preventDefault();
+                isPointerDown = true;
+                isDragging = false; 
+
+                const pos = getCanvasPos(e);
+                [lastX, lastY] = [pos.x, pos.y];
+                downPoint = { x: e.clientX, y: e.clientY };
+
+                ctx.lineWidth = penSizeInput.value;
+                ctx.strokeStyle = penColorInput.value;
+            };
+
+            const onCanvasPointerMove = (e) => {
+                if (!isPointerDown) return;
+                e.preventDefault();
+
+                if (!isDragging) {
+                    const dx = e.clientX - downPoint.x;
+                    const dy = e.clientY - downPoint.y;
+                    if ((dx * dx + dy * dy) >= (dragThreshold * dragThreshold)) {
+                        isDragging = true;
+                    }
+                }
+                
+                if (isDragging) {
+                    const pos = getCanvasPos(e);
+                    ctx.beginPath();
+                    ctx.moveTo(lastX, lastY);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                    [lastX, lastY] = [pos.x, pos.y];
+                }
+            };
+
+            const onCanvasPointerUp = (e) => {
+                if (!isPointerDown) return;
+                e.preventDefault();
+
+                if (!isDragging) {
+                    handleInteraction();
+                }
+
+                isPointerDown = false;
+                isDragging = false;
+            };
+
+            canvas.addEventListener('pointerdown', onCanvasPointerDown, { passive: false });
+            canvas.addEventListener('pointermove', onCanvasPointerMove, { passive: false });
+            canvas.addEventListener('pointerup', onCanvasPointerUp, { passive: false });
+            canvas.addEventListener('pointerleave', onCanvasPointerUp, { passive: false });
+        }
+
+
+        window.addEventListener('resize', () => {
+             setupCanvas();
+             if (popup.style.display === 'flex') {
+                 resetLayoutStyles();
+                 adjustLayoutForFit();
+             }
+        });
+        window.onload = () => {
+            showScreen(startScreen);
+            setupCanvas();
+            setupPenListeners();
+            initializeLineObserver();
+        };
+
+    </script>
+</body>
+</html>
